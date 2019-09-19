@@ -26,6 +26,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/klog/klogr"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha2"
+	clusterv1alpha2 "sigs.k8s.io/cluster-api/api/v1alpha2"
 	"sigs.k8s.io/cluster-api/controllers"
 	"sigs.k8s.io/cluster-api/util/restmapper"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -43,6 +44,7 @@ func init() {
 
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = clusterv1.AddToScheme(scheme)
+	_ = clusterv1alpha2.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -56,6 +58,7 @@ func main() {
 		machineConcurrency           int
 		machineSetConcurrency        int
 		machineDeploymentConcurrency int
+		machinePoolConcurrency       int
 		syncPeriod                   time.Duration
 	)
 
@@ -82,6 +85,9 @@ func main() {
 
 	flag.IntVar(&machineDeploymentConcurrency, "machinedeployment-concurrency", 1,
 		"Number of machine deployments to process simultaneously")
+
+	flag.IntVar(&machinePoolConcurrency, "machineset-concurrency", 1,
+		"Number of machine sets to process simultaneously")
 
 	flag.DurationVar(&syncPeriod, "sync-period", 10*time.Minute,
 		"The minimum interval at which watched resources are reconciled (e.g. 15m)")
@@ -136,6 +142,13 @@ func main() {
 		Log:    ctrl.Log.WithName("controllers").WithName("MachineDeployment"),
 	}).SetupWithManager(mgr, concurrency(machineDeploymentConcurrency)); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MachineDeployment")
+		os.Exit(1)
+	}
+	if err = (&controllers.MachinePoolReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("MachinePool"),
+	}).SetupWithManager(mgr, concurrency(machinePoolConcurrency)); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "MachinePool")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
