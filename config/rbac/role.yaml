@@ -49,6 +49,7 @@ rules:
   - cluster.x-k8s.io
   resources:
   - machinepools
+  - machinepools/status
   verbs:
   - create
   - delete
@@ -57,14 +58,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - cluster.x-k8s.io
-  resources:
-  - machinepools/status
-  verbs:
-  - get
-  - patch
-  - update
 - apiGroups:
   - cluster.x-k8s.io
   resources:
