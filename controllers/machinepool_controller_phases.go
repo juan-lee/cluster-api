@@ -59,7 +59,8 @@ func (r *MachinePoolReconciler) reconcilePhase(ctx context.Context, mp *clusterv
 	}
 
 	// Set the phase to "running" if there is a NodeRef field.
-	if mp.Status.ValidNodeRefs() && mp.Status.InfrastructureReady {
+	// TODO(jpang): check replicas against nodes before going into running
+	if mp.Status.InfrastructureReady {
 		mp.Status.SetTypedPhase(clusterv1.MachinePoolPhaseRunning)
 	}
 
@@ -216,17 +217,19 @@ func (r *MachinePoolReconciler) reconcileInfrastructure(ctx context.Context, mp 
 		)
 	}
 
-	if err := util.UnstructuredUnmarshalField(infraConfig, &mp.Spec.Instances, "spec", "instances"); err != nil {
+	// Get Spec.ProviderID from the infrastructure provider.
+	var providerID string
+	if err := util.UnstructuredUnmarshalField(infraConfig, &providerID, "spec", "providerID"); err != nil {
 		return errors.Wrapf(err, "failed to retrieve data from infrastructure provider for MachinePool %q in namespace %q", mp.Name, mp.Namespace)
-	} else if mp.Spec.Instances == nil {
-		return errors.Errorf("retrieved empty Spec.Instances from infrastructure provider for MachinePool %q in namespace %q", mp.Name, mp.Namespace)
+	} else if providerID == "" {
+		return errors.Errorf("retrieved empty Spec.ProviderID from infrastructure provider for Machine %q in namespace %q", mp.Name, mp.Namespace)
 	}
 
-	// Get and set Status.Addresses from the infrastructure provider.
-	err = util.UnstructuredUnmarshalField(infraConfig, &mp.Status.Instances, "status", "instances")
+	// Get and set Status.Replicas from the infrastructure provider.
+	err = util.UnstructuredUnmarshalField(infraConfig, &mp.Status.Replicas, "status", "replicas")
 	if err != nil {
 		if err != util.ErrUnstructuredFieldNotFound {
-			return errors.Wrapf(err, "failed to retrieve addresses from infrastructure provider for MachinePool %q in namespace %q", mp.Name, mp.Namespace)
+			return errors.Wrapf(err, "failed to retrieve replicas from infrastructure provider for MachinePool %q in namespace %q", mp.Name, mp.Namespace)
 		}
 	}
 

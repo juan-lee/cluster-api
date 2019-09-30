@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	"github.com/go-logr/logr"
@@ -40,6 +41,10 @@ import (
 	capierrors "sigs.k8s.io/cluster-api/errors"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/patch"
+)
+
+var (
+	errNilProviderID = errors.New("providerid is nil")
 )
 
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;patch
@@ -142,7 +147,6 @@ func (r *MachinePoolReconciler) reconcile(ctx context.Context, cluster *clusterv
 	reconciliationErrors := []error{
 		r.reconcileBootstrap(ctx, mp),
 		r.reconcileInfrastructure(ctx, mp),
-		r.reconcileNodeRefs(ctx, cluster, mp),
 	}
 
 	// Parse the errors, making sure we record if there is a RequeueAfterError.
@@ -165,16 +169,13 @@ func (r *MachinePoolReconciler) reconcile(ctx context.Context, cluster *clusterv
 }
 
 func (r *MachinePoolReconciler) reconcileDelete(ctx context.Context, cluster *clusterv1.Cluster, mp *clusterv1.MachinePool) (ctrl.Result, error) {
-	for n := range mp.Status.Instances {
-		if mp.Status.Instances[n].NodeRef == nil {
-			// TODO(juan-lee): what do we do for missing NodeRefs?
-			continue
-		}
-		klog.Infof("Deleting node %q for machine pool %q", mp.Status.Instances[n].NodeRef.Name, mp.Name)
-		if err := r.deleteNode(ctx, cluster, mp.Status.Instances[n].NodeRef.Name); err != nil && !apierrors.IsNotFound(err) {
-			klog.Errorf("Error deleting node %q for machine pool %q: %v", mp.Status.Instances[n].NodeRef.Name, mp.Name, err)
-			return ctrl.Result{}, err
-		}
+	if mp.Spec.ProviderID == nil {
+		return ctrl.Result{}, errNilProviderID
+	}
+	klog.Infof("Deleting nodes in %q for machine pool %q", *mp.Spec.ProviderID, mp.Name)
+	if err := r.deleteNodes(ctx, cluster, *mp.Spec.ProviderID); err != nil && !apierrors.IsNotFound(err) {
+		klog.Errorf("Error deleting node %q for machine pool %q: %v", *mp.Spec.ProviderID, mp.Name, err)
+		return ctrl.Result{}, err
 	}
 
 	if ok, err := r.reconcileDeleteExternal(ctx, mp); !ok || err != nil {
@@ -187,14 +188,24 @@ func (r *MachinePoolReconciler) reconcileDelete(ctx context.Context, cluster *cl
 	return ctrl.Result{}, nil
 }
 
-func (r *MachinePoolReconciler) deleteNode(ctx context.Context, cluster *clusterv1.Cluster, name string) error {
+func (r *MachinePoolReconciler) deleteNodes(ctx context.Context, cluster *clusterv1.Cluster, name string) error {
 	if cluster == nil {
 		// Try to retrieve the Node from the local cluster, if no Cluster reference is found.
-		var node corev1.Node
-		if err := r.Client.Get(ctx, client.ObjectKey{Name: name}, &node); err != nil {
+		var nodes corev1.NodeList
+		if err := r.Client.List(ctx, &nodes); err != nil {
 			return err
 		}
-		return r.Client.Delete(ctx, &node)
+		for n := range nodes.Items {
+			if strings.HasPrefix(nodes.Items[n].Spec.ProviderID, name) {
+				err := r.Client.Delete(ctx, &nodes.Items[n])
+				if err != nil {
+					klog.Errorf("Error deleting node %q while deleting MachinePool with ProviderIDs %q/*, won't retry: %v",
+						nodes.Items[n].Name, name, err)
+					return nil
+				}
+			}
+		}
+		return nil
 	}
 
 	// Otherwise, proceed to get the remote cluster client and get the Node.
@@ -212,7 +223,24 @@ func (r *MachinePoolReconciler) deleteNode(ctx context.Context, cluster *cluster
 		return nil
 	}
 
-	return corev1Remote.Nodes().Delete(name, &metav1.DeleteOptions{})
+	nodes, err := corev1Remote.Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		klog.Errorf("Error listing nodes for cluster %q while deleting MachinePool %q, won't retry: %v",
+			cluster.Name, name, err)
+		return nil
+	}
+
+	for n := range nodes.Items {
+		if strings.HasPrefix(nodes.Items[n].Spec.ProviderID, name) {
+			err := corev1Remote.Nodes().Delete(nodes.Items[n].Name, &metav1.DeleteOptions{})
+			if err != nil {
+				klog.Errorf("Error deleting node %q for cluster %q while deleting MachinePool with ProviderIDs %q/*, won't retry: %v",
+					nodes.Items[n].Name, cluster.Name, name, err)
+				return nil
+			}
+		}
+	}
+	return nil
 }
 
 // reconcileDeleteExternal tries to delete external references, returning true if it cannot find any.

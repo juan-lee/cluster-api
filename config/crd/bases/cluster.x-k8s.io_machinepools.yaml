@@ -8,9 +8,17 @@ metadata:
 spec:
   group: cluster.x-k8s.io
   names:
+    categories:
+    - cluster-api
     kind: MachinePool
+    listKind: MachinePoolList
     plural: machinepools
-  scope: ""
+    shortNames:
+    - mp
+    singular: machinepool
+  scope: Namespaced
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       description: MachinePool is the Schema for the machinepools API
@@ -116,30 +124,6 @@ spec:
                   description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                   type: string
               type: object
-            instances:
-              description: Instances defines a list of machine instances in a MachinePool.
-              items:
-                description: Instance describes each machine instance in a MachinePool.
-                properties:
-                  providerID:
-                    description: ProviderID is the identification ID of the machine
-                      provided by the provider. This field must match the provider
-                      ID as seen on the node object corresponding to this machine.
-                      This field is required by higher level consumers of cluster-api.
-                      Example use case is cluster autoscaler with cluster-api as provider.
-                      Clean-up logic in the autoscaler compares machines to nodes
-                      to find out machines at provider which could not get registered
-                      as Kubernetes nodes. With cluster-api as a generic out-of-tree
-                      provider for autoscaler, this field is required by autoscaler
-                      to be able to have a provider view of the list of machines.
-                      Another list of nodes is queried from the k8s apiserver and
-                      then a comparison is done to find out unregistered machines
-                      and are marked for delete. This field will be set by the actuators
-                      and consumed by higher level entities like autoscaler that will
-                      be interfacing with cluster-api as generic provider.
-                    type: string
-                type: object
-              type: array
             metadata:
               description: ObjectMeta will autopopulate the Node created. Use this
                 to indicate what labels, annotations, name prefix, etc., should be
@@ -235,6 +219,22 @@ spec:
                     type: object
                   type: array
               type: object
+            providerID:
+              description: ProviderID is the identification ID of the machine provided
+                by the provider. This field must match the provider ID as seen on
+                the node object corresponding to this machine. This field is required
+                by higher level consumers of cluster-api. Example use case is cluster
+                autoscaler with cluster-api as provider. Clean-up logic in the autoscaler
+                compares machines to nodes to find out machines at provider which
+                could not get registered as Kubernetes nodes. With cluster-api as
+                a generic out-of-tree provider for autoscaler, this field is required
+                by autoscaler to be able to have a provider view of the list of machines.
+                Another list of nodes is queried from the k8s apiserver and then a
+                comparison is done to find out unregistered machines and are marked
+                for delete. This field will be set by the actuators and consumed by
+                higher level entities like autoscaler that will be interfacing with
+                cluster-api as generic provider.
+              type: string
             version:
               description: Version defines the desired Kubernetes version. This field
                 is meant to be optionally used by bootstrap providers.
@@ -262,87 +262,15 @@ spec:
               description: InfrastructureReady is the state of the infrastructure
                 provider.
               type: boolean
-            instances:
-              description: Instances defines the observed state of machines in a MachinePool.
-              items:
-                description: InstanceStatus describes the status of each machine instance
-                  in a MachinePool.
-                properties:
-                  addresses:
-                    description: Addresses is a list of addresses assigned to the
-                      machine. This field is copied from the infrastructure provider
-                      reference.
-                    items:
-                      description: MachineAddress contains information for the node's
-                        address.
-                      properties:
-                        address:
-                          description: The machine address.
-                          type: string
-                        type:
-                          description: Machine address type, one of Hostname, ExternalIP
-                            or InternalIP.
-                          type: string
-                      required:
-                      - address
-                      - type
-                      type: object
-                    type: array
-                  lastUpdated:
-                    description: LastUpdated identifies when this status was last
-                      observed.
-                    format: date-time
-                    type: string
-                  nodeRef:
-                    description: NodeRef will point to the corresponding Node if it
-                      exists.
-                    properties:
-                      apiVersion:
-                        description: API version of the referent.
-                        type: string
-                      fieldPath:
-                        description: 'If referring to a piece of an object instead
-                          of an entire object, this string should contain a valid
-                          JSON/Go field access statement, such as desiredState.manifest.containers[2].
-                          For example, if the object reference is to a container within
-                          a pod, this would take on a value like: "spec.containers{name}"
-                          (where "name" refers to the name of the container that triggered
-                          the event) or if no container name is specified "spec.containers[2]"
-                          (container with index 2 in this pod). This syntax is chosen
-                          only to have some well-defined way of referencing a part
-                          of an object. TODO: this design is not final and this field
-                          is subject to change in the future.'
-                        type: string
-                      kind:
-                        description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
-                        type: string
-                      name:
-                        description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
-                        type: string
-                      namespace:
-                        description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
-                        type: string
-                      resourceVersion:
-                        description: 'Specific resourceVersion to which this reference
-                          is made, if any. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency'
-                        type: string
-                      uid:
-                        description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
-                        type: string
-                    type: object
-                  version:
-                    description: Version specifies the current version of Kubernetes
-                      running on the corresponding Node. This is meant to be a means
-                      of bubbling up status from the Node to the machine instance.
-                      It is entirely optional, but useful for end-user UX if it’s
-                      present.
-                    type: string
-                type: object
-              type: array
             phase:
               description: Phase represents the current phase of cluster actuation.
                 E.g. Pending, Running, Terminating, Failed etc.
               type: string
+            replicas:
+              description: Replicas is the most recently observed number of replicas.
+              type: integer
+          required:
+          - replicas
           type: object
       type: object
   version: v1alpha2
