@@ -50,9 +50,18 @@ type MachinePoolSpec struct {
 	// +optional
 	Version *string `json:"version,omitempty"`
 
-	// Instances defines a list of machine instances in a MachinePool.
+	// ProviderID is the identification ID of the machine provided by the provider.
+	// This field must match the provider ID as seen on the node object corresponding to this machine.
+	// This field is required by higher level consumers of cluster-api. Example use case is cluster autoscaler
+	// with cluster-api as provider. Clean-up logic in the autoscaler compares machines to nodes to find out
+	// machines at provider which could not get registered as Kubernetes nodes. With cluster-api as a
+	// generic out-of-tree provider for autoscaler, this field is required by autoscaler to be
+	// able to have a provider view of the list of machines. Another list of nodes is queried from the k8s apiserver
+	// and then a comparison is done to find out unregistered machines and are marked for delete.
+	// This field will be set by the actuators and consumed by higher level entities like autoscaler that will
+	// be interfacing with cluster-api as generic provider.
 	// +optional
-	Instances []Instance `json:"instances,omitempty"`
+	ProviderID *string `json:"providerID,omitempty"`
 }
 
 // ANCHOR_END: MachinePoolSpec
@@ -61,9 +70,8 @@ type MachinePoolSpec struct {
 
 // MachinePoolStatus defines the observed state of MachinePool
 type MachinePoolStatus struct {
-	// Instances defines the observed state of machines in a MachinePool.
-	// +optional
-	Instances []InstanceStatus `json:"instances,omitempty"`
+	// Replicas is the most recently observed number of replicas.
+	Replicas int `json:"replicas"`
 
 	// ErrorReason indicates that there is a problem reconciling the state, and
 	// will be set to a token value suitable for programmatic interpretation.
@@ -112,60 +120,10 @@ func (m *MachinePoolStatus) GetTypedPhase() MachinePoolPhase {
 	}
 }
 
-// ValidNodeRefs returns true if all NodeRefs have been populated.
-func (m *MachinePoolStatus) ValidNodeRefs() bool {
-	for n := range m.Instances {
-		if m.Instances[n].NodeRef == nil {
-			return false
-		}
-	}
-	return true
-}
-
-// ANCHOR: InstanceStatus
-
-// Instance describes each machine instance in a MachinePool.
-type Instance struct {
-	// ProviderID is the identification ID of the machine provided by the provider.
-	// This field must match the provider ID as seen on the node object corresponding to this machine.
-	// This field is required by higher level consumers of cluster-api. Example use case is cluster autoscaler
-	// with cluster-api as provider. Clean-up logic in the autoscaler compares machines to nodes to find out
-	// machines at provider which could not get registered as Kubernetes nodes. With cluster-api as a
-	// generic out-of-tree provider for autoscaler, this field is required by autoscaler to be
-	// able to have a provider view of the list of machines. Another list of nodes is queried from the k8s apiserver
-	// and then a comparison is done to find out unregistered machines and are marked for delete.
-	// This field will be set by the actuators and consumed by higher level entities like autoscaler that will
-	// be interfacing with cluster-api as generic provider.
-	// +optional
-	ProviderID *string `json:"providerID,omitempty"`
-}
-
-// InstanceStatus describes the status of each machine instance in a MachinePool.
-type InstanceStatus struct {
-	// NodeRef will point to the corresponding Node if it exists.
-	// +optional
-	NodeRef *corev1.ObjectReference `json:"nodeRef,omitempty"`
-
-	// LastUpdated identifies when this status was last observed.
-	// +optional
-	LastUpdated *metav1.Time `json:"lastUpdated,omitempty"`
-
-	// Version specifies the current version of Kubernetes running
-	// on the corresponding Node. This is meant to be a means of bubbling
-	// up status from the Node to the machine instance.
-	// It is entirely optional, but useful for end-user UX if it’s present.
-	// +optional
-	Version *string `json:"version,omitempty"`
-
-	// Addresses is a list of addresses assigned to the machine.
-	// This field is copied from the infrastructure provider reference.
-	// +optional
-	Addresses MachineAddresses `json:"addresses,omitempty"`
-}
-
-// ANCHOR_END: InstanceStatus
-
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:path=machinepools,shortName=mp,scope=Namespaced,categories=cluster-api
+// +kubebuilder:subresource:status
+// +kubebuilder:storageversion
 
 // MachinePool is the Schema for the machinepools API
 type MachinePool struct {

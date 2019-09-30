@@ -86,7 +86,7 @@ func main() {
 	flag.IntVar(&machineDeploymentConcurrency, "machinedeployment-concurrency", 1,
 		"Number of machine deployments to process simultaneously")
 
-	flag.IntVar(&machinePoolConcurrency, "machineset-concurrency", 1,
+	flag.IntVar(&machinePoolConcurrency, "machinepool-concurrency", 1,
 		"Number of machine sets to process simultaneously")
 
 	flag.DurationVar(&syncPeriod, "sync-period", 10*time.Minute,
