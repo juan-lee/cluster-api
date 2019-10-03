@@ -59,8 +59,7 @@ func (r *MachinePoolReconciler) reconcilePhase(ctx context.Context, mp *clusterv
 	}
 
 	// Set the phase to "running" if there is a NodeRef field.
-	// TODO(jpang): check replicas against nodes before going into running
-	if mp.Status.InfrastructureReady {
+	if mp.Status.InfrastructureReady && mp.Status.NodeRefs != nil && len(mp.Status.NodeRefs) == mp.Status.Replicas {
 		mp.Status.SetTypedPhase(clusterv1.MachinePoolPhaseRunning)
 	}
 
@@ -222,7 +221,7 @@ func (r *MachinePoolReconciler) reconcileInfrastructure(ctx context.Context, mp 
 	if err := util.UnstructuredUnmarshalField(infraConfig, &providerID, "spec", "providerID"); err != nil {
 		return errors.Wrapf(err, "failed to retrieve data from infrastructure provider for MachinePool %q in namespace %q", mp.Name, mp.Namespace)
 	} else if providerID == "" {
-		return errors.Errorf("retrieved empty Spec.ProviderID from infrastructure provider for Machine %q in namespace %q", mp.Name, mp.Namespace)
+		return errors.Errorf("retrieved empty Spec.ProviderID from infrastructure provider for MachinePool %q in namespace %q", mp.Name, mp.Namespace)
 	}
 
 	// Get and set Status.Replicas from the infrastructure provider.

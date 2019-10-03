@@ -120,7 +120,9 @@ func (r *MachinePoolReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, rete
 
 	// Handle deletion reconciliation loop.
 	if !mp.ObjectMeta.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, cluster, mp)
+		// TODO(jpang): implement delete
+		// return r.reconcileDelete(ctx, cluster, mp)
+		return ctrl.Result{}, nil
 	}
 
 	// Handle normal reconciliation loop.
@@ -140,13 +142,15 @@ func (r *MachinePoolReconciler) reconcile(ctx context.Context, cluster *clusterv
 
 	// If the MachinePool doesn't have a finalizer, add one.
 	if !util.Contains(mp.Finalizers, clusterv1.MachinePoolFinalizer) {
-		mp.Finalizers = append(mp.ObjectMeta.Finalizers, clusterv1.MachinePoolFinalizer)
+		// TODO(jpang): implement delete
+		// mp.Finalizers = append(mp.ObjectMeta.Finalizers, clusterv1.MachinePoolFinalizer)
 	}
 
 	// Call the inner reconciliation methods.
 	reconciliationErrors := []error{
 		r.reconcileBootstrap(ctx, mp),
 		r.reconcileInfrastructure(ctx, mp),
+		r.reconcileNodeRefs(ctx, cluster, mp),
 	}
 
 	// Parse the errors, making sure we record if there is a RequeueAfterError.

@@ -70,8 +70,21 @@ type MachinePoolSpec struct {
 
 // MachinePoolStatus defines the observed state of MachinePool
 type MachinePoolStatus struct {
+	// NodeRefs will point to the corresponding Nodes if it they exist.
+	// +optional
+	NodeRefs []corev1.ObjectReference `json:"nodeRefs,omitempty"`
+
 	// Replicas is the most recently observed number of replicas.
+	// +optional
 	Replicas int `json:"replicas"`
+
+	// The number of ready replicas for this MachineSet. A machine is considered ready when the node has been created and is "Ready".
+	// +optional
+	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
+
+	// The number of available replicas (ready for at least minReadySeconds) for this MachineSet.
+	// +optional
+	AvailableReplicas int32 `json:"availableReplicas,omitempty"`
 
 	// ErrorReason indicates that there is a problem reconciling the state, and
 	// will be set to a token value suitable for programmatic interpretation.
@@ -124,6 +137,8 @@ func (m *MachinePoolStatus) GetTypedPhase() MachinePoolPhase {
 // +kubebuilder:resource:path=machinepools,shortName=mp,scope=Namespaced,categories=cluster-api
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
+// +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="MachinePool status such as Terminating/Pending/Running/Failed etc"
+// +kubebuilder:printcolumn:name="Replicas",type="string",JSONPath=".status.replicas",description="MachinePool replicas count"
 
 // MachinePool is the Schema for the machinepools API
 type MachinePool struct {
