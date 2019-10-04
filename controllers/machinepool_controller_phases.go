@@ -48,11 +48,6 @@ func (r *MachinePoolReconciler) reconcilePhase(ctx context.Context, mp *clusterv
 		mp.Status.SetTypedPhase(clusterv1.MachinePoolPhaseProvisioning)
 	}
 
-	// Set the phase to "provisioning" if the MachinePool has an InfrastructureRef object associated.
-	if !mp.Status.InfrastructureReady {
-		mp.Status.SetTypedPhase(clusterv1.MachinePoolPhaseProvisioning)
-	}
-
 	// Set the phase to "provisioned" if the infrastructure is ready.
 	if mp.Status.InfrastructureReady {
 		mp.Status.SetTypedPhase(clusterv1.MachinePoolPhaseProvisioned)
@@ -221,7 +216,9 @@ func (r *MachinePoolReconciler) reconcileInfrastructure(ctx context.Context, mp 
 	if err := util.UnstructuredUnmarshalField(infraConfig, &providerID, "spec", "providerID"); err != nil {
 		return errors.Wrapf(err, "failed to retrieve data from infrastructure provider for MachinePool %q in namespace %q", mp.Name, mp.Namespace)
 	} else if providerID == "" {
-		return errors.Errorf("retrieved empty Spec.ProviderID from infrastructure provider for MachinePool %q in namespace %q", mp.Name, mp.Namespace)
+		return errors.Wrapf(&capierrors.RequeueAfterError{RequeueAfter: externalReadyWait},
+			"retrieved empty Spec.ProviderID from infrastructure provider for MachinePool %q in namespace %q", mp.Name, mp.Namespace,
+		)
 	}
 
 	// Get and set Status.Replicas from the infrastructure provider.
@@ -230,8 +227,13 @@ func (r *MachinePoolReconciler) reconcileInfrastructure(ctx context.Context, mp 
 		if err != util.ErrUnstructuredFieldNotFound {
 			return errors.Wrapf(err, "failed to retrieve replicas from infrastructure provider for MachinePool %q in namespace %q", mp.Name, mp.Namespace)
 		}
+	} else if mp.Status.Replicas == 0 {
+		return errors.Wrapf(&capierrors.RequeueAfterError{RequeueAfter: externalReadyWait},
+			"retrieved unset Status.Replicas from infrastructure provider for MachinePool %q in namespace %q", mp.Name, mp.Namespace,
+		)
 	}
 
+	mp.Spec.ProviderID = &providerID
 	mp.Status.InfrastructureReady = true
 	return nil
 }
