@@ -13,7 +13,15 @@ spec:
     type: string
   - JSONPath: .status.replicas
     description: MachinePool replicas count
-    name: Replicas
+    name: Desired
+    type: string
+  - JSONPath: .status.availableReplicas
+    description: MachinePool current replica count
+    name: Current
+    type: string
+  - JSONPath: .status.readyReplicas
+    description: MachinePool ready replica count
+    name: Ready
     type: string
   group: cluster.x-k8s.io
   names:

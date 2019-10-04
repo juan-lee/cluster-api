@@ -67,7 +67,7 @@ func (r *MachinePoolReconciler) reconcileNodeRefs(ctx context.Context, cluster *
 	}
 
 	// Get the Node reference.
-	nodeRefs, err := r.getNodeReferences(corev1Client, *machinepool.Spec.ProviderID)
+	nodeRefs, available, ready, err := r.getNodeReferences(corev1Client, *machinepool.Spec.ProviderID)
 	if err != nil {
 		if err == ErrNodeNotFound {
 			return errors.Wrapf(&capierrors.RequeueAfterError{RequeueAfter: 10 * time.Second},
@@ -83,6 +83,8 @@ func (r *MachinePoolReconciler) reconcileNodeRefs(ctx context.Context, cluster *
 			"Replicas != NodeRefs [%q != %q] for MachinePool %q in namespace %q", len(nodeRefs), machinepool.Status.Replicas, machinepool.Name, machinepool.Namespace)
 	}
 
+	machinepool.Status.AvailableReplicas = int32(available)
+	machinepool.Status.ReadyReplicas = int32(ready)
 	machinepool.Status.NodeRefs = nodeRefs
 	klog.Infof("Set MachinePool's (%q in namespace %q) NodeRefs to %q", machinepool.Name, machinepool.Namespace, machinepool.Status.NodeRefs)
 	r.recorder.Event(machinepool, apicorev1.EventTypeNormal, "SuccessfulSetNodeRef", fmt.Sprintf("%+v", machinepool.Status.NodeRefs))
@@ -90,18 +92,26 @@ func (r *MachinePoolReconciler) reconcileNodeRefs(ctx context.Context, cluster *
 }
 
 // nolint
-func (r *MachinePoolReconciler) getNodeReferences(client corev1.NodesGetter, providerID string) ([]apicorev1.ObjectReference, error) {
+func (r *MachinePoolReconciler) getNodeReferences(client corev1.NodesGetter, providerID string) ([]apicorev1.ObjectReference, int, int, error) {
 	listOpt := metav1.ListOptions{}
 	var nodeRefs []apicorev1.ObjectReference
 
+	ready := 0
+	available := 0
 	for {
 		nodeList, err := client.Nodes().List(listOpt)
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, err
 		}
 
 		for _, node := range nodeList.Items {
 			if strings.HasPrefix(node.Spec.ProviderID, providerID) {
+				available++
+				nodeReady := isReady(&node)
+				if nodeReady {
+					ready++
+				}
+				klog.Infof("Found node %q in ready(%v) with providerID %q", node.Name, nodeReady, node.Spec.ProviderID)
 				nodeRefs = append(nodeRefs, apicorev1.ObjectReference{
 					Kind:       node.Kind,
 					APIVersion: node.APIVersion,
@@ -118,7 +128,16 @@ func (r *MachinePoolReconciler) getNodeReferences(client corev1.NodesGetter, pro
 	}
 
 	if nodeRefs == nil {
-		return nil, ErrNodeNotFound
+		return nil, 0, 0, ErrNodeNotFound
 	}
-	return nodeRefs, nil
+	return nodeRefs, available, ready, nil
+}
+
+func isReady(node *apicorev1.Node) bool {
+	for _, n := range node.Status.Conditions {
+		if n.Type == apicorev1.NodeReady {
+			return n.Status == apicorev1.ConditionTrue
+		}
+	}
+	return false
 }
