@@ -138,7 +138,9 @@ func (m *MachinePoolStatus) GetTypedPhase() MachinePoolPhase {
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
 // +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="MachinePool status such as Terminating/Pending/Running/Failed etc"
-// +kubebuilder:printcolumn:name="Replicas",type="string",JSONPath=".status.replicas",description="MachinePool replicas count"
+// +kubebuilder:printcolumn:name="Desired",type="string",JSONPath=".status.replicas",description="MachinePool replicas count"
+// +kubebuilder:printcolumn:name="Current",type="string",JSONPath=".status.availableReplicas",description="MachinePool current replica count"
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.readyReplicas",description="MachinePool ready replica count"
 
 // MachinePool is the Schema for the machinepools API
 type MachinePool struct {
