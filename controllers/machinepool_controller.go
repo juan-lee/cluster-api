@@ -251,8 +251,8 @@ func (r *MachinePoolReconciler) deleteNodes(ctx context.Context, cluster *cluste
 func (r *MachinePoolReconciler) reconcileDeleteExternal(ctx context.Context, m *clusterv1.MachinePool) (bool, error) {
 	objects := []*unstructured.Unstructured{}
 	references := []*corev1.ObjectReference{
-		m.Spec.Bootstrap.ConfigRef,
-		&m.Spec.InfrastructureRef,
+		m.Spec.Template.Spec.Bootstrap.ConfigRef,
+		&m.Spec.Template.Spec.InfrastructureRef,
 	}
 
 	// Loop over the references and try to retrieve it with the client.

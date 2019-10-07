@@ -137,7 +137,7 @@ func (r *MachinePoolReconciler) reconcileExternal(ctx context.Context, mp *clust
 // TODO(juan-lee): combine Machine/MachinePool reconcileBootstrap
 func (r *MachinePoolReconciler) reconcileBootstrap(ctx context.Context, mp *clusterv1.MachinePool) error {
 	// TODO(vincepri): Move this validation in kubebuilder / webhook.
-	if mp.Spec.Bootstrap.ConfigRef == nil && mp.Spec.Bootstrap.Data == nil {
+	if mp.Spec.Template.Spec.Bootstrap.ConfigRef == nil && mp.Spec.Template.Spec.Bootstrap.Data == nil {
 		return errors.Errorf(
 			"Expected at least one of `Bootstrap.ConfigRef` or `Bootstrap.Data` to be populated for MachinePool %q in namespace %q",
 			mp.Name, mp.Namespace,
@@ -146,16 +146,16 @@ func (r *MachinePoolReconciler) reconcileBootstrap(ctx context.Context, mp *clus
 
 	// Call generic external reconciler if we have an external reference.
 	var bootstrapConfig *unstructured.Unstructured
-	if mp.Spec.Bootstrap.ConfigRef != nil {
+	if mp.Spec.Template.Spec.Bootstrap.ConfigRef != nil {
 		var err error
-		bootstrapConfig, err = r.reconcileExternal(ctx, mp, mp.Spec.Bootstrap.ConfigRef)
+		bootstrapConfig, err = r.reconcileExternal(ctx, mp, mp.Spec.Template.Spec.Bootstrap.ConfigRef)
 		if err != nil {
 			return err
 		}
 	}
 
 	// If the bootstrap data is populated, set ready and return.
-	if mp.Spec.Bootstrap.Data != nil {
+	if mp.Spec.Template.Spec.Bootstrap.Data != nil {
 		mp.Status.BootstrapReady = true
 		return nil
 	}
@@ -182,7 +182,7 @@ func (r *MachinePoolReconciler) reconcileBootstrap(ctx context.Context, mp *clus
 		return errors.Errorf("retrieved empty data from bootstrap provider for MachinePool %q in namespace %q", mp.Name, mp.Namespace)
 	}
 
-	mp.Spec.Bootstrap.Data = pointer.StringPtr(data)
+	mp.Spec.Template.Spec.Bootstrap.Data = pointer.StringPtr(data)
 	mp.Status.BootstrapReady = true
 	return nil
 }
@@ -190,7 +190,7 @@ func (r *MachinePoolReconciler) reconcileBootstrap(ctx context.Context, mp *clus
 // reconcileInfrastructure reconciles the Spec.InfrastructureRef object on a MachinePool.
 func (r *MachinePoolReconciler) reconcileInfrastructure(ctx context.Context, mp *clusterv1.MachinePool) error {
 	// Call generic external reconciler.
-	infraConfig, err := r.reconcileExternal(ctx, mp, &mp.Spec.InfrastructureRef)
+	infraConfig, err := r.reconcileExternal(ctx, mp, &mp.Spec.Template.Spec.InfrastructureRef)
 	if infraConfig == nil && err == nil {
 		return nil
 	} else if err != nil {

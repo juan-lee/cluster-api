@@ -246,7 +246,7 @@ func MachinePoolToInfrastructureMapFunc(gvk schema.GroupVersionKind) handler.ToR
 		}
 
 		// Return early if the GroupVersionKind doesn't match what we expect.
-		infraGVK := m.Spec.InfrastructureRef.GroupVersionKind()
+		infraGVK := m.Spec.Template.Spec.InfrastructureRef.GroupVersionKind()
 		if gvk != infraGVK {
 			return nil
 		}
@@ -255,7 +255,7 @@ func MachinePoolToInfrastructureMapFunc(gvk schema.GroupVersionKind) handler.ToR
 			{
 				NamespacedName: client.ObjectKey{
 					Namespace: m.Namespace,
-					Name:      m.Spec.InfrastructureRef.Name,
+					Name:      m.Spec.Template.Spec.InfrastructureRef.Name,
 				},
 			},
 		}

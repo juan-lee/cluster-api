@@ -31,24 +31,29 @@ const (
 
 // MachinePoolSpec defines the desired state of MachinePool
 type MachinePoolSpec struct {
-	// ObjectMeta will autopopulate the Node created. Use this to
-	// indicate what labels, annotations, name prefix, etc., should be used
-	// when creating the Node.
+	// Number of desired machines. Defaults to 1.
+	// This is a pointer to distinguish between explicit zero and not specified.
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Label selector for machines. Existing MachineSets whose machines are
+	// selected by this will be the ones affected by this deployment.
+	// It must match the machine template's labels.
+	Selector metav1.LabelSelector `json:"selector"`
+
+	// Template describes the machines that will be created.
+	Template MachineTemplateSpec `json:"template"`
+
+	// The deployment strategy to use to replace existing machines with
+	// new ones.
 	// +optional
-	ObjectMeta `json:"metadata,omitempty"`
+	Strategy *MachineDeploymentStrategy `json:"strategy,omitempty"`
 
-	// Bootstrap is a reference to a local struct which encapsulates
-	// fields to configure the MachinePool’s bootstrapping mechanism.
-	Bootstrap Bootstrap `json:"bootstrap"`
-
-	// InfrastructureRef is a required reference to a custom resource
-	// offered by an infrastructure provider.
-	InfrastructureRef corev1.ObjectReference `json:"infrastructureRef"`
-
-	// Version defines the desired Kubernetes version.
-	// This field is meant to be optionally used by bootstrap providers.
+	// Minimum number of seconds for which a newly created machine should
+	// be ready.
+	// Defaults to 0 (machine will be considered available as soon as it
+	// is ready)
 	// +optional
-	Version *string `json:"version,omitempty"`
+	MinReadySeconds *int32 `json:"minReadySeconds,omitempty"`
 
 	// ProviderID is the identification ID of the machine provided by the provider.
 	// This field must match the provider ID as seen on the node object corresponding to this machine.
