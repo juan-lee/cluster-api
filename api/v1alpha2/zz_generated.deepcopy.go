@@ -520,10 +520,10 @@ func (in *MachinePoolSpec) DeepCopyInto(out *MachinePoolSpec) {
 		*out = new(int32)
 		**out = **in
 	}
-	if in.ProviderID != nil {
-		in, out := &in.ProviderID, &out.ProviderID
-		*out = new(string)
-		**out = **in
+	if in.ProviderIDs != nil {
+		in, out := &in.ProviderIDs, &out.ProviderIDs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 }
 

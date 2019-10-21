@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -51,7 +50,7 @@ func (r *MachinePoolReconciler) reconcileNodeRefs(ctx context.Context, cluster *
 	}
 
 	// Check that the MachinePool has a valid ProviderID.
-	if machinepool.Spec.ProviderID == nil || *machinepool.Spec.ProviderID == "" {
+	if machinepool.Spec.ProviderIDs == nil || len(machinepool.Spec.ProviderIDs) == 0 {
 		klog.Warningf("MachinePool %q in namespace %q doesn't have a valid ProviderID yet", machinepool.Name, machinepool.Namespace)
 		return nil
 	}
@@ -67,7 +66,7 @@ func (r *MachinePoolReconciler) reconcileNodeRefs(ctx context.Context, cluster *
 	}
 
 	// Get the Node reference.
-	nodeRefs, available, ready, err := r.getNodeReferences(corev1Client, *machinepool.Spec.ProviderID)
+	nodeRefs, available, ready, err := r.getNodeReferences(corev1Client, machinepool.Spec.ProviderIDs)
 	if err != nil {
 		if err == ErrNodeNotFound {
 			return errors.Wrapf(&capierrors.RequeueAfterError{RequeueAfter: 10 * time.Second},
@@ -78,52 +77,55 @@ func (r *MachinePoolReconciler) reconcileNodeRefs(ctx context.Context, cluster *
 		return err
 	}
 
-	if machinepool.Status.Replicas == 0 || len(nodeRefs) != machinepool.Status.Replicas {
-		return errors.Wrapf(&capierrors.RequeueAfterError{RequeueAfter: 10 * time.Second},
-			"Replicas != NodeRefs [%q != %q] for MachinePool %q in namespace %q", len(nodeRefs), machinepool.Status.Replicas, machinepool.Name, machinepool.Namespace)
-	}
-
 	machinepool.Status.AvailableReplicas = int32(available)
 	machinepool.Status.ReadyReplicas = int32(ready)
 	machinepool.Status.NodeRefs = nodeRefs
 	klog.Infof("Set MachinePool's (%q in namespace %q) NodeRefs to %q", machinepool.Name, machinepool.Namespace, machinepool.Status.NodeRefs)
 	r.recorder.Event(machinepool, apicorev1.EventTypeNormal, "SuccessfulSetNodeRef", fmt.Sprintf("%+v", machinepool.Status.NodeRefs))
+
+	if machinepool.Status.ReadyReplicas == 0 || len(nodeRefs) != int(machinepool.Status.ReadyReplicas) {
+		return errors.Wrapf(&capierrors.RequeueAfterError{RequeueAfter: 10 * time.Second},
+			"NodeRefs != ReadyReplicas [%q != %q] for MachinePool %q in namespace %q", len(nodeRefs), machinepool.Status.ReadyReplicas, machinepool.Name, machinepool.Namespace)
+	}
 	return nil
 }
 
 // nolint
-func (r *MachinePoolReconciler) getNodeReferences(client corev1.NodesGetter, providerID string) ([]apicorev1.ObjectReference, int, int, error) {
-	listOpt := metav1.ListOptions{}
-	var nodeRefs []apicorev1.ObjectReference
-
-	ready := 0
-	available := 0
+func (r *MachinePoolReconciler) getNodeReferences(client corev1.NodesGetter, providerIDs []string) ([]apicorev1.ObjectReference, int, int, error) {
+	var ready, available int
+	nodeRefsMap := make(map[string]apicorev1.Node)
 	for {
+		listOpt := metav1.ListOptions{}
 		nodeList, err := client.Nodes().List(listOpt)
 		if err != nil {
 			return nil, 0, 0, err
 		}
 
 		for _, node := range nodeList.Items {
-			if strings.HasPrefix(node.Spec.ProviderID, providerID) {
-				available++
-				nodeReady := isReady(&node)
-				if nodeReady {
-					ready++
-				}
-				klog.Infof("Found node %q in ready(%v) with providerID %q", node.Name, nodeReady, node.Spec.ProviderID)
-				nodeRefs = append(nodeRefs, apicorev1.ObjectReference{
-					Kind:       node.Kind,
-					APIVersion: node.APIVersion,
-					Name:       node.Name,
-					UID:        node.UID,
-				})
-			}
+			nodeRefsMap[node.Spec.ProviderID] = node
 		}
 
 		listOpt.Continue = nodeList.Continue
 		if listOpt.Continue == "" {
 			break
+		}
+	}
+
+	var nodeRefs []apicorev1.ObjectReference
+	for _, providerID := range providerIDs {
+		if node, ok := nodeRefsMap[providerID]; ok {
+			available++
+			nodeReady := isReady(&node)
+			if nodeReady {
+				ready++
+			}
+			klog.Infof("Found node %q in ready(%v) with providerID %q", node.Name, nodeReady, node.Spec.ProviderID)
+			nodeRefs = append(nodeRefs, apicorev1.ObjectReference{
+				Kind:       node.Kind,
+				APIVersion: node.APIVersion,
+				Name:       node.Name,
+				UID:        node.UID,
+			})
 		}
 	}
 

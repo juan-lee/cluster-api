@@ -11,7 +11,7 @@ spec:
     description: MachinePool status such as Terminating/Pending/Running/Failed etc
     name: Phase
     type: string
-  - JSONPath: .status.replicas
+  - JSONPath: .spec.replicas
     description: MachinePool replicas count
     name: Desired
     type: string
@@ -61,8 +61,8 @@ spec:
                 as soon as it is ready)
               format: int32
               type: integer
-            providerID:
-              description: ProviderID is the identification ID of the machine provided
+            providerIDs:
+              description: ProviderIDs is the identification ID of the machine provided
                 by the provider. This field must match the provider ID as seen on
                 the node object corresponding to this machine. This field is required
                 by higher level consumers of cluster-api. Example use case is cluster
@@ -76,7 +76,9 @@ spec:
                 for delete. This field will be set by the actuators and consumed by
                 higher level entities like autoscaler that will be interfacing with
                 cluster-api as generic provider.
-              type: string
+              items:
+                type: string
+              type: array
             replicas:
               description: Number of desired machines. Defaults to 1. This is a pointer
                 to distinguish between explicit zero and not specified.

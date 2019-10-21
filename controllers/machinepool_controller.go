@@ -146,6 +146,9 @@ func (r *MachinePoolReconciler) reconcile(ctx context.Context, cluster *clusterv
 		// mp.Finalizers = append(mp.ObjectMeta.Finalizers, clusterv1.MachinePoolFinalizer)
 	}
 
+	mp.Status.BootstrapReady = false
+	mp.Status.InfrastructureReady = false
+
 	// Call the inner reconciliation methods.
 	reconciliationErrors := []error{
 		r.reconcileBootstrap(ctx, mp),
@@ -173,14 +176,15 @@ func (r *MachinePoolReconciler) reconcile(ctx context.Context, cluster *clusterv
 }
 
 func (r *MachinePoolReconciler) reconcileDelete(ctx context.Context, cluster *clusterv1.Cluster, mp *clusterv1.MachinePool) (ctrl.Result, error) {
-	if mp.Spec.ProviderID == nil {
+	if mp.Spec.ProviderIDs == nil {
 		return ctrl.Result{}, errNilProviderID
 	}
-	klog.Infof("Deleting nodes in %q for machine pool %q", *mp.Spec.ProviderID, mp.Name)
-	if err := r.deleteNodes(ctx, cluster, *mp.Spec.ProviderID); err != nil && !apierrors.IsNotFound(err) {
-		klog.Errorf("Error deleting node %q for machine pool %q: %v", *mp.Spec.ProviderID, mp.Name, err)
-		return ctrl.Result{}, err
-	}
+	// TODO(jpang): fix this
+	// klog.Infof("Deleting nodes in %q for machine pool %q", *mp.Spec.ProviderID, mp.Name)
+	// if err := r.deleteNodes(ctx, cluster, *mp.Spec.ProviderID); err != nil && !apierrors.IsNotFound(err) {
+	// 	klog.Errorf("Error deleting node %q for machine pool %q: %v", *mp.Spec.ProviderID, mp.Name, err)
+	// 	return ctrl.Result{}, err
+	// }
 
 	if ok, err := r.reconcileDeleteExternal(ctx, mp); !ok || err != nil {
 		// Return early and don't remove the finalizer if we got an error or

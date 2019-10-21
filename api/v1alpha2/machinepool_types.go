@@ -55,7 +55,7 @@ type MachinePoolSpec struct {
 	// +optional
 	MinReadySeconds *int32 `json:"minReadySeconds,omitempty"`
 
-	// ProviderID is the identification ID of the machine provided by the provider.
+	// ProviderIDs is the identification ID of the machine provided by the provider.
 	// This field must match the provider ID as seen on the node object corresponding to this machine.
 	// This field is required by higher level consumers of cluster-api. Example use case is cluster autoscaler
 	// with cluster-api as provider. Clean-up logic in the autoscaler compares machines to nodes to find out
@@ -66,7 +66,7 @@ type MachinePoolSpec struct {
 	// This field will be set by the actuators and consumed by higher level entities like autoscaler that will
 	// be interfacing with cluster-api as generic provider.
 	// +optional
-	ProviderID *string `json:"providerID,omitempty"`
+	ProviderIDs []string `json:"providerIDs,omitempty"`
 }
 
 // ANCHOR_END: MachinePoolSpec
@@ -143,7 +143,7 @@ func (m *MachinePoolStatus) GetTypedPhase() MachinePoolPhase {
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
 // +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="MachinePool status such as Terminating/Pending/Running/Failed etc"
-// +kubebuilder:printcolumn:name="Desired",type="string",JSONPath=".status.replicas",description="MachinePool replicas count"
+// +kubebuilder:printcolumn:name="Desired",type="string",JSONPath=".spec.replicas",description="MachinePool replicas count"
 // +kubebuilder:printcolumn:name="Current",type="string",JSONPath=".status.availableReplicas",description="MachinePool current replica count"
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.readyReplicas",description="MachinePool ready replica count"
 
