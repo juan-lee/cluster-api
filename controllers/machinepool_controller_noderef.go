@@ -65,6 +65,11 @@ func (r *MachinePoolReconciler) reconcileNodeRefs(ctx context.Context, cluster *
 		return err
 	}
 
+	err = r.deleteRetiredNodes(corev1Client, machinepool.Status.NodeRefs, machinepool.Spec.ProviderIDs)
+	if err != nil {
+		return err
+	}
+
 	// Get the Node reference.
 	nodeRefs, available, ready, err := r.getNodeReferences(corev1Client, machinepool.Spec.ProviderIDs)
 	if err != nil {
@@ -86,6 +91,29 @@ func (r *MachinePoolReconciler) reconcileNodeRefs(ctx context.Context, cluster *
 	if machinepool.Status.ReadyReplicas == 0 || len(nodeRefs) != int(machinepool.Status.ReadyReplicas) {
 		return errors.Wrapf(&capierrors.RequeueAfterError{RequeueAfter: 10 * time.Second},
 			"NodeRefs != ReadyReplicas [%q != %q] for MachinePool %q in namespace %q", len(nodeRefs), machinepool.Status.ReadyReplicas, machinepool.Name, machinepool.Namespace)
+	}
+	return nil
+}
+
+// nolint
+func (r *MachinePoolReconciler) deleteRetiredNodes(client corev1.NodesGetter, nodeRefs []apicorev1.ObjectReference, providerIDs []string) error {
+	nodeRefsMap := make(map[string]*apicorev1.Node)
+	for _, nodeRef := range nodeRefs {
+		getOpt := metav1.GetOptions{}
+		node, err := client.Nodes().Get(nodeRef.Name, getOpt)
+		if err != nil {
+			return err
+		}
+		nodeRefsMap[node.Spec.ProviderID] = node
+	}
+	for _, providerID := range providerIDs {
+		delete(nodeRefsMap, providerID)
+	}
+	for _, node := range nodeRefsMap {
+		err := client.Nodes().Delete(node.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
