@@ -95,7 +95,6 @@ func (r *MachinePoolReconciler) reconcileNodeRefs(ctx context.Context, cluster *
 	return nil
 }
 
-// nolint
 func (r *MachinePoolReconciler) deleteRetiredNodes(client corev1.NodesGetter, nodeRefs []apicorev1.ObjectReference, providerIDs []string) error {
 	nodeRefsMap := make(map[string]*apicorev1.Node)
 	for _, nodeRef := range nodeRefs {
@@ -118,7 +117,6 @@ func (r *MachinePoolReconciler) deleteRetiredNodes(client corev1.NodesGetter, no
 	return nil
 }
 
-// nolint
 func (r *MachinePoolReconciler) getNodeReferences(client corev1.NodesGetter, providerIDs []string) ([]apicorev1.ObjectReference, int, int, error) {
 	var ready, available int
 	nodeRefsMap := make(map[string]apicorev1.Node)

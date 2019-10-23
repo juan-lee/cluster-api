@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"strings"
 	"sync"
 
 	"github.com/go-logr/logr"
@@ -120,9 +119,7 @@ func (r *MachinePoolReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, rete
 
 	// Handle deletion reconciliation loop.
 	if !mp.ObjectMeta.DeletionTimestamp.IsZero() {
-		// TODO(jpang): implement delete
-		// return r.reconcileDelete(ctx, cluster, mp)
-		return ctrl.Result{}, nil
+		return r.reconcileDelete(ctx, cluster, mp)
 	}
 
 	// Handle normal reconciliation loop.
@@ -142,10 +139,10 @@ func (r *MachinePoolReconciler) reconcile(ctx context.Context, cluster *clusterv
 
 	// If the MachinePool doesn't have a finalizer, add one.
 	if !util.Contains(mp.Finalizers, clusterv1.MachinePoolFinalizer) {
-		// TODO(jpang): implement delete
-		// mp.Finalizers = append(mp.ObjectMeta.Finalizers, clusterv1.MachinePoolFinalizer)
+		mp.Finalizers = append(mp.ObjectMeta.Finalizers, clusterv1.MachinePoolFinalizer)
 	}
 
+	// TODO(jpang): find a better way to deal with this.
 	mp.Status.BootstrapReady = false
 	mp.Status.InfrastructureReady = false
 
@@ -179,12 +176,6 @@ func (r *MachinePoolReconciler) reconcileDelete(ctx context.Context, cluster *cl
 	if mp.Spec.ProviderIDs == nil {
 		return ctrl.Result{}, errNilProviderID
 	}
-	// TODO(jpang): fix this
-	// klog.Infof("Deleting nodes in %q for machine pool %q", *mp.Spec.ProviderID, mp.Name)
-	// if err := r.deleteNodes(ctx, cluster, *mp.Spec.ProviderID); err != nil && !apierrors.IsNotFound(err) {
-	// 	klog.Errorf("Error deleting node %q for machine pool %q: %v", *mp.Spec.ProviderID, mp.Name, err)
-	// 	return ctrl.Result{}, err
-	// }
 
 	if ok, err := r.reconcileDeleteExternal(ctx, mp); !ok || err != nil {
 		// Return early and don't remove the finalizer if we got an error or
@@ -192,61 +183,35 @@ func (r *MachinePoolReconciler) reconcileDelete(ctx context.Context, cluster *cl
 		return ctrl.Result{}, err
 	}
 
+	if err := r.reconcileDeleteNodes(ctx, cluster, mp); err != nil {
+		// Return early and don't remove the finalizer if we got an error.
+		return ctrl.Result{}, err
+	}
+
 	mp.ObjectMeta.Finalizers = util.Filter(mp.ObjectMeta.Finalizers, clusterv1.MachinePoolFinalizer)
 	return ctrl.Result{}, nil
 }
 
-func (r *MachinePoolReconciler) deleteNodes(ctx context.Context, cluster *clusterv1.Cluster, name string) error {
+func (r *MachinePoolReconciler) reconcileDeleteNodes(ctx context.Context, cluster *clusterv1.Cluster, machinepool *clusterv1.MachinePool) error {
+	// Check that Cluster isn't nil.
 	if cluster == nil {
-		// Try to retrieve the Node from the local cluster, if no Cluster reference is found.
-		var nodes corev1.NodeList
-		if err := r.Client.List(ctx, &nodes); err != nil {
-			return err
-		}
-		for n := range nodes.Items {
-			if strings.HasPrefix(nodes.Items[n].Spec.ProviderID, name) {
-				err := r.Client.Delete(ctx, &nodes.Items[n])
-				if err != nil {
-					klog.Errorf("Error deleting node %q while deleting MachinePool with ProviderIDs %q/*, won't retry: %v",
-						nodes.Items[n].Name, name, err)
-					return nil
-				}
-			}
-		}
+		klog.V(2).Infof("MachinePool %q in namespace %q doesn't have a linked cluster, won't assign NodeRef", machinepool.Name, machinepool.Namespace)
 		return nil
 	}
 
-	// Otherwise, proceed to get the remote cluster client and get the Node.
-	remoteClient, err := remote.NewClusterClient(r.Client, cluster)
+	clusterClient, err := remote.NewClusterClient(r.Client, cluster)
 	if err != nil {
-		klog.Errorf("Error creating a remote client for cluster %q while deleting MachinePool %q, won't retry: %v",
-			cluster.Name, name, err)
-		return nil
+		return err
 	}
 
-	corev1Remote, err := remoteClient.CoreV1()
+	corev1Client, err := clusterClient.CoreV1()
 	if err != nil {
-		klog.Errorf("Error creating a remote client for cluster %q while deleting MachinePool %q, won't retry: %v",
-			cluster.Name, name, err)
-		return nil
+		return err
 	}
 
-	nodes, err := corev1Remote.Nodes().List(metav1.ListOptions{})
+	err = r.deleteRetiredNodes(corev1Client, machinepool.Status.NodeRefs, machinepool.Spec.ProviderIDs)
 	if err != nil {
-		klog.Errorf("Error listing nodes for cluster %q while deleting MachinePool %q, won't retry: %v",
-			cluster.Name, name, err)
-		return nil
-	}
-
-	for n := range nodes.Items {
-		if strings.HasPrefix(nodes.Items[n].Spec.ProviderID, name) {
-			err := corev1Remote.Nodes().Delete(nodes.Items[n].Name, &metav1.DeleteOptions{})
-			if err != nil {
-				klog.Errorf("Error deleting node %q for cluster %q while deleting MachinePool with ProviderIDs %q/*, won't retry: %v",
-					nodes.Items[n].Name, cluster.Name, name, err)
-				return nil
-			}
-		}
+		return err
 	}
 	return nil
 }
