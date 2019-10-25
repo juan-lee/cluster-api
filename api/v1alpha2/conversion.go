@@ -129,6 +129,32 @@ func (dst *MachineDeploymentList) ConvertFrom(srcRaw conversion.Hub) error {
 	return Convert_v1alpha3_MachineDeploymentList_To_v1alpha2_MachineDeploymentList(src, dst, nil)
 }
 
+func (src *MachinePool) ConvertTo(dstRaw conversion.Hub) error {
+	dst := dstRaw.(*v1alpha3.MachinePool)
+
+	return Convert_v1alpha2_MachinePool_To_v1alpha3_MachinePool(src, dst, nil)
+}
+
+// nolint
+func (dst *MachinePool) ConvertFrom(srcRaw conversion.Hub) error {
+	src := srcRaw.(*v1alpha3.MachinePool)
+
+	return Convert_v1alpha3_MachinePool_To_v1alpha2_MachinePool(src, dst, nil)
+}
+
+func (src *MachinePoolList) ConvertTo(dstRaw conversion.Hub) error {
+	dst := dstRaw.(*v1alpha3.MachinePoolList)
+
+	return Convert_v1alpha2_MachinePoolList_To_v1alpha3_MachinePoolList(src, dst, nil)
+}
+
+// nolint
+func (dst *MachinePoolList) ConvertFrom(srcRaw conversion.Hub) error {
+	src := srcRaw.(*v1alpha3.MachinePoolList)
+
+	return Convert_v1alpha3_MachinePoolList_To_v1alpha2_MachinePoolList(src, dst, nil)
+}
+
 func Convert_v1alpha2_MachineSpec_To_v1alpha3_MachineSpec(in *MachineSpec, out *v1alpha3.MachineSpec, s apiconversion.Scope) error {
 	if err := autoConvert_v1alpha2_MachineSpec_To_v1alpha3_MachineSpec(in, out, s); err != nil {
 		return err
@@ -153,4 +179,8 @@ func Convert_v1alpha3_MachineSetSpec_To_v1alpha2_MachineSetSpec(in *v1alpha3.Mac
 
 func Convert_v1alpha3_MachineSpec_To_v1alpha2_MachineSpec(in *v1alpha3.MachineSpec, out *MachineSpec, s apiconversion.Scope) error {
 	return errors.New("cannot recover removed MachineSpec Cluster Name")
+}
+
+func Convert_v1alpha3_MachinePoolSpec_To_v1alpha2_MachinePoolSpec(in *v1alpha3.MachinePoolSpec, out *MachinePoolSpec, s apiconversion.Scope) error {
+	return errors.New("cannot recover removed MachinePoolSpec Cluster Name")
 }

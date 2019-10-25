@@ -17,7 +17,6 @@ limitations under the License.
 package controllers
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -26,12 +25,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/klog"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/controllers/remote"
 	capierrors "sigs.k8s.io/cluster-api/errors"
 )
 
-func (r *MachinePoolReconciler) reconcileNodeRefs(ctx context.Context, cluster *clusterv1.Cluster, machinepool *clusterv1.MachinePool) error {
+func (r *MachinePoolReconciler) reconcileNodeRefs(cluster *clusterv1.Cluster, machinepool *clusterv1.MachinePool) error {
 	// Check that the MachinePool hasn't been deleted or in the process.
 	if !machinepool.DeletionTimestamp.IsZero() {
 		return nil

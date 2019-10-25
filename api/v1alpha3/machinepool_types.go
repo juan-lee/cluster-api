@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha2
+package v1alpha3
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +31,10 @@ const (
 
 // MachinePoolSpec defines the desired state of MachinePool
 type MachinePoolSpec struct {
+	// ClusterName is the name of the Cluster this object belongs to.
+	// +kubebuilder:validation:MinLength=1
+	ClusterName string `json:"clusterName"`
+
 	// Number of desired machines. Defaults to 1.
 	// This is a pointer to distinguish between explicit zero and not specified.
 	Replicas *int32 `json:"replicas,omitempty"`
@@ -136,6 +140,7 @@ func (m *MachinePoolStatus) GetTypedPhase() MachinePoolPhase {
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=machinepools,shortName=mp,scope=Namespaced,categories=cluster-api
 // +kubebuilder:subresource:status
+// +kubebuilder:storageversion
 // +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="MachinePool status such as Terminating/Pending/Running/Failed etc"
 // +kubebuilder:printcolumn:name="Desired",type="string",JSONPath=".spec.replicas",description="MachinePool replicas count"
 // +kubebuilder:printcolumn:name="Current",type="string",JSONPath=".status.availableReplicas",description="MachinePool current replica count"

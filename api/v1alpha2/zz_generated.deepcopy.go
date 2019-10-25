@@ -472,7 +472,7 @@ func (in *MachinePool) DeepCopyObject() runtime.Object {
 func (in *MachinePoolList) DeepCopyInto(out *MachinePoolList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]MachinePool, len(*in))
@@ -508,7 +508,6 @@ func (in *MachinePoolSpec) DeepCopyInto(out *MachinePoolSpec) {
 		*out = new(int32)
 		**out = **in
 	}
-	in.Selector.DeepCopyInto(&out.Selector)
 	in.Template.DeepCopyInto(&out.Template)
 	if in.Strategy != nil {
 		in, out := &in.Strategy, &out.Strategy

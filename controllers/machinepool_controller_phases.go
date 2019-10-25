@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog"
 	"k8s.io/utils/pointer"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/controllers/external"
 	capierrors "sigs.k8s.io/cluster-api/errors"
 	"sigs.k8s.io/cluster-api/util"
@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-func (r *MachinePoolReconciler) reconcilePhase(ctx context.Context, mp *clusterv1.MachinePool) {
+func (r *MachinePoolReconciler) reconcilePhase(mp *clusterv1.MachinePool) {
 	// Set the phase to "pending" if nil.
 	if mp.Status.Phase == "" {
 		mp.Status.SetTypedPhase(clusterv1.MachinePoolPhasePending)
@@ -71,7 +71,7 @@ func (r *MachinePoolReconciler) reconcilePhase(ctx context.Context, mp *clusterv
 
 // reconcileExternal handles generic unstructured objects referenced by a MachinePool
 func (r *MachinePoolReconciler) reconcileExternal(ctx context.Context, mp *clusterv1.MachinePool, ref *corev1.ObjectReference) (*unstructured.Unstructured, error) {
-	obj, err := external.Get(r.Client, ref, mp.Namespace)
+	obj, err := external.Get(ctx, r.Client, ref, mp.Namespace)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, errors.Wrapf(&capierrors.RequeueAfterError{RequeueAfter: 30 * time.Second},

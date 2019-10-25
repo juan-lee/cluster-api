@@ -33,8 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha2"
-	clusterv1alpha2 "sigs.k8s.io/cluster-api/api/v1alpha2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
+	clusterv1alpha3 "sigs.k8s.io/cluster-api/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/controllers/external"
 	"sigs.k8s.io/cluster-api/controllers/remote"
 	capierrors "sigs.k8s.io/cluster-api/errors"
@@ -64,7 +64,7 @@ type MachinePoolReconciler struct {
 
 func (r *MachinePoolReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
 	c, err := ctrl.NewControllerManagedBy(mgr).
-		For(&clusterv1alpha2.MachinePool{}).
+		For(&clusterv1alpha3.MachinePool{}).
 		WithOptions(options).
 		Build(r)
 
@@ -96,7 +96,7 @@ func (r *MachinePoolReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, rete
 
 	defer func() {
 		// Always reconcile the Status.Phase field.
-		r.reconcilePhase(ctx, mp)
+		r.reconcilePhase(mp)
 
 		// Always attempt to Patch the MachinePool object and status after each reconciliation.
 		if err := patchHelper.Patch(ctx, mp); err != nil {
@@ -106,15 +106,16 @@ func (r *MachinePoolReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, rete
 		}
 	}()
 
-	// Cluster might be nil as some providers might not require a cluster object
-	// for machine pool management.
-	cluster, err := util.GetClusterFromMetadata(ctx, r.Client, mp.ObjectMeta)
-	if errors.Cause(err) == util.ErrNoCluster {
-		klog.V(2).Infof("MachinePool %q in namespace %q doesn't specify %q label, assuming nil cluster",
-			mp.Name, mp.Namespace, clusterv1.MachineClusterLabelName)
-	} else if err != nil {
-		return ctrl.Result{}, errors.Wrapf(err, "failed to get cluster %q for machine pool %q in namespace %q",
-			mp.Labels[clusterv1.MachineClusterLabelName], mp.Name, mp.Namespace)
+	// Reconcile and retrieve the Cluster object.
+	if mp.Labels == nil {
+		mp.Labels = make(map[string]string)
+	}
+	mp.Labels[clusterv1.ClusterLabelName] = mp.Spec.ClusterName
+
+	cluster, err := util.GetClusterByName(ctx, r.Client, mp.ObjectMeta.Namespace, mp.Spec.ClusterName)
+	if err != nil {
+		return ctrl.Result{}, errors.Wrapf(err, "failed to get cluster %q for machine %q in namespace %q",
+			mp.Labels[clusterv1.ClusterLabelName], mp.Name, mp.Namespace)
 	}
 
 	// Handle deletion reconciliation loop.
@@ -139,7 +140,7 @@ func (r *MachinePoolReconciler) reconcile(ctx context.Context, cluster *clusterv
 
 	// If the MachinePool doesn't have a finalizer, add one.
 	if !util.Contains(mp.Finalizers, clusterv1.MachinePoolFinalizer) {
-		mp.Finalizers = append(mp.ObjectMeta.Finalizers, clusterv1.MachinePoolFinalizer)
+		mp.ObjectMeta.Finalizers = append(mp.ObjectMeta.Finalizers, clusterv1.MachinePoolFinalizer)
 	}
 
 	// TODO(jpang): find a better way to deal with this.
@@ -150,7 +151,7 @@ func (r *MachinePoolReconciler) reconcile(ctx context.Context, cluster *clusterv
 	reconciliationErrors := []error{
 		r.reconcileBootstrap(ctx, mp),
 		r.reconcileInfrastructure(ctx, mp),
-		r.reconcileNodeRefs(ctx, cluster, mp),
+		r.reconcileNodeRefs(cluster, mp),
 	}
 
 	// Parse the errors, making sure we record if there is a RequeueAfterError.
@@ -183,7 +184,7 @@ func (r *MachinePoolReconciler) reconcileDelete(ctx context.Context, cluster *cl
 		return ctrl.Result{}, err
 	}
 
-	if err := r.reconcileDeleteNodes(ctx, cluster, mp); err != nil {
+	if err := r.reconcileDeleteNodes(cluster, mp); err != nil {
 		// Return early and don't remove the finalizer if we got an error.
 		return ctrl.Result{}, err
 	}
@@ -192,7 +193,7 @@ func (r *MachinePoolReconciler) reconcileDelete(ctx context.Context, cluster *cl
 	return ctrl.Result{}, nil
 }
 
-func (r *MachinePoolReconciler) reconcileDeleteNodes(ctx context.Context, cluster *clusterv1.Cluster, machinepool *clusterv1.MachinePool) error {
+func (r *MachinePoolReconciler) reconcileDeleteNodes(cluster *clusterv1.Cluster, machinepool *clusterv1.MachinePool) error {
 	// Check that Cluster isn't nil.
 	if cluster == nil {
 		klog.V(2).Infof("MachinePool %q in namespace %q doesn't have a linked cluster, won't assign NodeRef", machinepool.Name, machinepool.Namespace)
@@ -230,7 +231,7 @@ func (r *MachinePoolReconciler) reconcileDeleteExternal(ctx context.Context, m *
 			continue
 		}
 
-		obj, err := external.Get(r.Client, ref, m.Namespace)
+		obj, err := external.Get(ctx, r.Client, ref, m.Namespace)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, errors.Wrapf(err, "failed to get %s %q for MachinePool %q in namespace %q",
 				ref.GroupVersionKind(), ref.Name, m.Name, m.Namespace)

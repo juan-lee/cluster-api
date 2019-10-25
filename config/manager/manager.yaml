@@ -29,8 +29,6 @@ spec:
         - --enable-leader-election
         image: controller:latest
         name: manager
-        # TODO(jpang): remove before PR
-        imagePullPolicy: Always
         resources:
           limits:
             memory: 100Mi
