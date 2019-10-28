@@ -143,10 +143,6 @@ func (r *MachinePoolReconciler) reconcile(ctx context.Context, cluster *clusterv
 		mp.ObjectMeta.Finalizers = append(mp.ObjectMeta.Finalizers, clusterv1.MachinePoolFinalizer)
 	}
 
-	// TODO(jpang): find a better way to deal with this.
-	mp.Status.BootstrapReady = false
-	mp.Status.InfrastructureReady = false
-
 	// Call the inner reconciliation methods.
 	reconciliationErrors := []error{
 		r.reconcileBootstrap(ctx, mp),

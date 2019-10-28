@@ -134,7 +134,6 @@ func (r *MachinePoolReconciler) reconcileExternal(ctx context.Context, mp *clust
 }
 
 // reconcileBootstrap reconciles the Spec.Bootstrap.ConfigRef object on a MachinePool.
-// TODO(juan-lee): combine Machine/MachinePool reconcileBootstrap
 func (r *MachinePoolReconciler) reconcileBootstrap(ctx context.Context, mp *clusterv1.MachinePool) error {
 	// TODO(vincepri): Move this validation in kubebuilder / webhook.
 	if mp.Spec.Template.Spec.Bootstrap.ConfigRef == nil && mp.Spec.Template.Spec.Bootstrap.Data == nil {
@@ -154,12 +153,6 @@ func (r *MachinePoolReconciler) reconcileBootstrap(ctx context.Context, mp *clus
 		}
 	}
 
-	// If the bootstrap data is populated, set ready and return.
-	if mp.Spec.Template.Spec.Bootstrap.Data != nil {
-		mp.Status.BootstrapReady = true
-		return nil
-	}
-
 	// If the bootstrap config is being deleted, return early.
 	if !bootstrapConfig.GetDeletionTimestamp().IsZero() {
 		return nil
@@ -169,7 +162,10 @@ func (r *MachinePoolReconciler) reconcileBootstrap(ctx context.Context, mp *clus
 	ready, err := external.IsReady(bootstrapConfig)
 	if err != nil {
 		return err
-	} else if !ready {
+	}
+
+	mp.Status.BootstrapReady = ready
+	if !mp.Status.BootstrapReady {
 		return errors.Wrapf(&capierrors.RequeueAfterError{RequeueAfter: externalReadyWait},
 			"Bootstrap provider for MachinePool %q in namespace %q is not ready, requeuing", mp.Name, mp.Namespace)
 	}
@@ -183,7 +179,6 @@ func (r *MachinePoolReconciler) reconcileBootstrap(ctx context.Context, mp *clus
 	}
 
 	mp.Spec.Template.Spec.Bootstrap.Data = pointer.StringPtr(data)
-	mp.Status.BootstrapReady = true
 	return nil
 }
 
@@ -197,15 +192,17 @@ func (r *MachinePoolReconciler) reconcileInfrastructure(ctx context.Context, mp 
 		return err
 	}
 
-	if mp.Status.InfrastructureReady || !infraConfig.GetDeletionTimestamp().IsZero() {
+	if !infraConfig.GetDeletionTimestamp().IsZero() {
 		return nil
 	}
 
-	// Determine if the infrastructure provider is ready.
 	ready, err := external.IsReady(infraConfig)
 	if err != nil {
 		return err
-	} else if !ready {
+	}
+
+	mp.Status.InfrastructureReady = ready
+	if !mp.Status.InfrastructureReady {
 		return errors.Wrapf(&capierrors.RequeueAfterError{RequeueAfter: externalReadyWait},
 			"Infrastructure provider for MachinePool %q in namespace %q is not ready, requeuing", mp.Name, mp.Namespace,
 		)
@@ -231,7 +228,5 @@ func (r *MachinePoolReconciler) reconcileInfrastructure(ctx context.Context, mp 
 			"retrieved unset Status.Replicas from infrastructure provider for MachinePool %q in namespace %q", mp.Name, mp.Namespace,
 		)
 	}
-
-	mp.Status.InfrastructureReady = true
 	return nil
 }

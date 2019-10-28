@@ -36,12 +36,6 @@ func (r *MachinePoolReconciler) reconcileNodeRefs(cluster *clusterv1.Cluster, ma
 		return nil
 	}
 
-	// Check that the MachinePool doesn't already have a NodeRef.
-	// TODO(jpang): check for the correct number of available replicas
-	// if machinepool.Status.NodeRefs != nil {
-	// 	return nil
-	// }
-
 	// Check that Cluster isn't nil.
 	if cluster == nil {
 		klog.V(2).Infof("MachinePool %q in namespace %q doesn't have a linked cluster, won't assign NodeRef", machinepool.Name, machinepool.Namespace)
